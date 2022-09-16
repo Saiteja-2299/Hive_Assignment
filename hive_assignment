@@ -1,0 +1,158 @@
+1.#Store raw data into hdfs location
+[cloudera@quickstart ~]$ cd /tmp/hive_class
+[cloudera@quickstart hive_class]$ ll
+total 624
+-rw-rw-r-- 1 cloudera cloudera    216 Sep  9 10:14 array_data.csv
+-rw-rw-r-- 1 cloudera cloudera    312 Sep 16 03:54 csv_table.csv
+-rw-rw-r-- 1 cloudera cloudera    681 Sep  3 22:41 DEPT_DATA.csv
+-rw-rw-r-- 1 cloudera cloudera 252804 Sep 16 05:06 hive-hcatalog-core-0.14.0.jar
+-rw-rw-r-- 1 cloudera cloudera    179 Sep 16 04:24 json_file.csv
+-rw-rw-r-- 1 cloudera cloudera    196 Sep  9 10:43 map_data.csv
+-rw-rw-r-- 1 cloudera cloudera    300 Sep 10 02:16 sales_data.csv
+-rw-rw-r-- 1 cloudera cloudera 360233 Sep 16 10:21 sales_order_data.csv
+[cloudera@quickstart hive_class]$ hadoop fs -put /tmp/hive_class/sales_order_data.csv /tmp/hive_class
+[cloudera@quickstart hive_class]$ hadoop fs -ls /tmp/hive_class
+Found 2 items
+-rw-r--r--   1 cloudera supergroup        681 2022-09-09 08:37 /tmp/hive_class/DEPT_DATA.csv
+-rw-r--r--   1 cloudera supergroup     360233 2022-09-16 10:24 /tmp/hive_class/sales_order_data.csv
+
+2. #Create a internal hive table "sales_order_csv" which will store csv data sales_order_csv .. make sure to skip header row while creating table
+[cloudera@quickstart //]$ hive
+
+Logging initialized using configuration in file:/etc/hive/conf.dist/hive-log4j.properties
+WARNING: Hive CLI is deprecated and migration to Beeline is recommended.
+hive> create database hive_assignment;
+OK
+Time taken: 1.511 seconds
+hive> use hive_assignment;
+OK
+Time taken: 0.077 seconds
+
+hive> create table sales_order_csv(ORDERNUMBER int,
+    > QUANTITYORDERED int,
+    > PRICEEACH float,
+    > ORDERLINENUMBER int,
+    > SALES float,
+    > STATUS string,
+    > QTR_ID int,
+    > MONTH_ID int,
+    > YEAR_ID int,
+    > PRODUCTLINE string,
+    > MSRP int,
+    > PRODUCTCODE string,
+    > PHONE string,
+    > CITY string,
+    > STATE string,
+    > POSTALCODE string,
+    > COUNTRY string,
+    > TERRITORY string,
+    > CONTACTLASTNAME string,
+    > CONTACTFIRSTNAME string,
+    > DEALSIZE string)
+    > row format delimited
+    > fields terminated by ','
+    > tblproperties("skip.header.line.count"="1");
+OK
+Time taken: 0.766 seconds
+4. #Load data from hdfs path into "sales_order_csv" 
+
+hive> load data local inpath '/tmp/hive_class/' into table sales_order_csv;
+Loading data to table hive_assignment.sales_order_csv
+Table hive_assignment.sales_order_csv stats: [numFiles=8, totalSize=614921]
+OK
+Time taken: 2.761 seconds
+
+5.#Create an internal hive table which will store data in ORC format "sales_order_orc"
+
+hive> create table sales_order_orc(
+    > ORDERNUMBER int,
+    > QUANTITYORDERED int,
+    > PRICEEACH float,
+    > ORDERLINENUMBER int,
+    > SALES float,
+    > STATUS string,
+    > QTR_ID int,
+    > MONTH_ID int,
+    > YEAR_ID int,
+    > PRODUCTLINE string,
+    > MSRP int,
+    > PRODUCTCODE string,
+    > PHONE string,
+    > CITY string,
+    > STATE string,
+    > POSTALCODE string,
+    > COUNTRY string,
+    > TERRITORY string,
+    > CONTACTLASTNAME string,
+    > CONTACTFIRSTNAME string,
+    > DEALSIZE string)
+    > stored as orc;
+OK
+Time taken: 0.302 seconds
+
+6.#Load data from "sales_order_csv" into "sales_order_orc"
+
+hive> from sales_order_csv insert overwrite table sales_order_orc select *;
+Query ID = cloudera_20220916105757_67df46af-0fd0-405d-a40a-3bfe407e40aa
+Total jobs = 1
+Launching Job 1 out of 1
+Number of reduce tasks is set to 0 since there's no reduce operator
+Starting Job = job_1663346515485_0002, Tracking URL = http://quickstart.cloudera:8088/proxy/application_1663346515485_0002/
+Kill Command = /usr/lib/hadoop/bin/hadoop job  -kill job_1663346515485_0002
+Hadoop job information for Stage-1: number of mappers: 1; number of reducers: 0
+2022-09-16 10:57:47,356 Stage-1 map = 0%,  reduce = 0%
+2022-09-16 10:58:20,298 Stage-1 map = 100%,  reduce = 0%, Cumulative CPU 7.97 sec
+MapReduce Total cumulative CPU time: 7 seconds 970 msec
+Ended Job = job_1663346515485_0002
+Stage-4 is selected by condition resolver.
+Stage-3 is filtered out by condition resolver.
+Stage-5 is filtered out by condition resolver.
+Moving data to: hdfs://quickstart.cloudera:8020/user/hive/warehouse/hive_assignment.db/sales_order_orc/.hive-staging_hive_2022-09-16_10-57-06_141_49537003234866701-1/-ext-10000
+Loading data to table hive_assignment.sales_order_orc
+Table hive_assignment.sales_order_orc stats: [numFiles=1, numRows=5000, totalSize=38953, rawDataSize=3154192]
+MapReduce Jobs Launched:
+Stage-Stage-1: Map: 1   Cumulative CPU: 7.97 sec   HDFS Read: 622875 HDFS Write: 39047 SUCCESS
+Total MapReduce CPU Time Spent: 7 seconds 970 msec
+OK
+Time taken: 76.533 seconds
+
+7a.#Calculatye total sales per year
+
+hive> select year_id,sum(sales) as total_sales from sales_order_orc group by year_id;
+Query ID = cloudera_20220916110202_d5ea8656-129f-4c69-b07b-a977cb62dc18
+Total jobs = 1
+Launching Job 1 out of 1
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Starting Job = job_1663346515485_0003, Tracking URL = http://quickstart.cloudera:8088/proxy/application_1663346515485_0003/
+Kill Command = /usr/lib/hadoop/bin/hadoop job  -kill job_1663346515485_0003
+Hadoop job information for Stage-1: number of mappers: 1; number of reducers: 1
+2022-09-16 11:02:51,247 Stage-1 map = 0%,  reduce = 0%
+2022-09-16 11:03:19,256 Stage-1 map = 100%,  reduce = 0%, Cumulative CPU 4.01 sec
+2022-09-16 11:03:43,270 Stage-1 map = 100%,  reduce = 100%, Cumulative CPU 8.2 sec
+MapReduce Total cumulative CPU time: 8 seconds 200 msec
+Ended Job = job_1663346515485_0003
+MapReduce Jobs Launched:
+Stage-Stage-1: Map: 1  Reduce: 1   Cumulative CPU: 8.2 sec   HDFS Read: 36918 HDFS Write: 76 SUCCESS
+Total MapReduce CPU Time Spent: 8 seconds 200 msec
+OK
+YEAR_ID    total_sales
+2003    3516979.547241211
+2004    4724162.593383789
+2005    1791486.7086791992
+Time taken: 84.078 seconds, Fetched: 4 row(s)
+
+#7b.Find a product for which maximum orders were placed
+
+
+
+
+
+
+
+
